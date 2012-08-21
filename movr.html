@@ -1,0 +1,72 @@
+<html>
+  <head>
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
+    <meta charset="utf-8">
+    <title>Google Maps JavaScript API v3 Example: Marker Simple</title>
+    <script src="http://maps.googleapis.com/maps/api/js?sensor=false&libraries=geometry"></script>
+    <style>
+      #map_canvas {
+       height: 100%;
+     }
+    </style>
+    <script>
+      var map;
+      var lat = 37.75;
+      var lng = -122.45;
+
+      function initialize() {
+        var myLatlng = new google.maps.LatLng(lat, lng);
+        var mapOptions = {
+          zoom: 12,
+          center: myLatlng,
+          mapTypeId: google.maps.MapTypeId.ROADMAP
+        }
+        map = new google.maps.Map(document.getElementById('map_canvas'), mapOptions);
+
+        var marker = new google.maps.Marker({
+            position: myLatlng,
+            map: map
+        });
+
+      var t=  google.maps.event.addListener(marker, 'click', function() {
+          addMarkers();
+        });
+
+      }
+      /* add some markers and animate them to some place nearby */
+      function addMarkers(){
+        for (var i=0; i < 10; i++){
+          var marker = new google.maps.Marker({
+            position: new google.maps.LatLng(lat, lng),
+            map: map,
+            icon: 'http://www.google.com/intl/en_us/mapfiles/ms/icons/blue-dot.png'
+          });
+          animateMarker(marker)
+        }
+      }
+
+      function animateMarker(marker){
+        var c = 0;
+        var start = new google.maps.LatLng(lat, lng);
+        var endLat = lat + (Math.random() - .5) / 10;
+        var endLng = lng + (Math.random() - .5) / 10;
+        var end = new google.maps.LatLng(endLat, endLng);
+
+        var path = [marker.getPosition(), end];
+
+        var interval = setInterval(function() { 
+          var current = google.maps.geometry.spherical.interpolate(start, end, c / 100);
+          marker.setPosition(current);
+          c++; 
+          if(c >= 100) clearInterval(interval);
+        }, 1);
+
+
+      }
+
+    </script>
+  </head>
+  <body onload="initialize()">
+    <div id="map_canvas"></div>
+  </body>
+</html>
