@@ -2,7 +2,7 @@
   <head>
     <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
     <meta charset="utf-8">
-    <title>Google Maps JavaScript API v3 Example: Marker Simple</title>
+    <title>Movr [animated markers]</title>
     <script src="http://maps.googleapis.com/maps/api/js?sensor=false&libraries=geometry"></script>
     <style>
       #map_canvas {
@@ -15,11 +15,26 @@
       var lng = -122.45;
 
       function initialize() {
+        var styles = [
+          {
+            stylers: [
+              { visibility: "simplified" },
+              { saturation: -100 }
+            ]
+          },{
+            featureType: "water",
+            stylers: [
+              { lightness: -66 }
+            ]
+          }
+        ]
+
         var myLatlng = new google.maps.LatLng(lat, lng);
         var mapOptions = {
-          zoom: 12,
+          zoom: 13,
           center: myLatlng,
-          mapTypeId: google.maps.MapTypeId.ROADMAP
+          mapTypeId: google.maps.MapTypeId.ROADMAP,
+          styles: styles
         }
         map = new google.maps.Map(document.getElementById('map_canvas'), mapOptions);
 
@@ -28,7 +43,7 @@
             map: map
         });
 
-      var t=  google.maps.event.addListener(marker, 'click', function() {
+        google.maps.event.addListener(marker, 'click', function() {
           addMarkers();
         });
 
@@ -39,29 +54,31 @@
           var marker = new google.maps.Marker({
             position: new google.maps.LatLng(lat, lng),
             map: map,
-            icon: 'http://www.google.com/intl/en_us/mapfiles/ms/icons/blue-dot.png'
+            icon: 'http://www.google.com/intl/en_us/mapfiles/ms/icons/blue-dot.png',
+            optimized: false,
+            clickable: false,
+            zIndex: 1
           });
           animateMarker(marker)
         }
       }
 
       function animateMarker(marker){
-        var c = 0;
         var start = new google.maps.LatLng(lat, lng);
-        var endLat = lat + (Math.random() - .5) / 10;
-        var endLng = lng + (Math.random() - .5) / 10;
+
+        var endLat = lat + (Math.random() - .5) / 20;
+        var endLng = lng + (Math.random() - .5) / 15;
         var end = new google.maps.LatLng(endLat, endLng);
 
-        var path = [marker.getPosition(), end];
-
+        var c = 0;
         var interval = setInterval(function() { 
-          var current = google.maps.geometry.spherical.interpolate(start, end, c / 100);
+          var current = google.maps.geometry.spherical.interpolate(start, end, c / 50);
           marker.setPosition(current);
           c++; 
-          if(c >= 100) clearInterval(interval);
+          if(c >= 50) {
+            clearInterval(interval);
+          }
         }, 1);
-
-
       }
 
     </script>
