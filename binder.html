@@ -1,0 +1,130 @@
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Bind a second map</title>
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta charset="UTF-8">
+    <style type="text/css">
+      html, body{
+        margin: 0;
+        padding: 0;
+        height: 100%;
+      }
+
+      #map_canvas1{
+        height:600px;
+        width:800px;
+        position:absolute;
+        top:40px;
+        left:0px;
+      }
+      #map_canvas2{
+        height:600px;
+        width:800px;
+        position:absolute;
+        top:40px;
+        left:0px;
+        background:transparent;
+      }
+      .legend{
+        width:50px;
+      }
+      #info{
+        margin-bottom:20px;
+        margin-top:15px;
+      }
+      .info_legend{
+        height:40px;
+        width:20px;
+        float:left;
+      }
+
+      #sidebar{
+        width:300px;
+        float:left;
+        padding:15px;
+      }
+      #map_div{
+        margin-left:320px;
+      }
+    </style>
+    <script type="text/javascript"
+        src="https://maps.googleapis.com/maps/api/js?sensor=false"></script>
+    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script>
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.18/jquery-ui.min.js"></script>
+
+    <script type="text/javascript">
+      var map1;
+      var map2;
+      function initialize() {
+        var myOptions = {
+          zoom: 8,
+          center: new google.maps.LatLng(-34.397, 150.644),
+          mapTypeId: google.maps.MapTypeId.ROADMAP
+        };
+        map1 = new google.maps.Map(document.getElementById('map_canvas1'),
+            myOptions);
+
+        map1.active = false;
+
+        map2 = new google.maps.Map(document.getElementById('map_canvas2'),
+            myOptions);
+        map2.active=true;
+
+
+        var styles= [
+            {
+              stylers: [
+                { saturation: -68 }
+              ]
+            },{
+              elementType: "labels",
+              stylers: [
+                { visibility: "off" }
+              ]
+            }
+          ]
+       var overlayStyles = [
+          {"featureType":"all",
+          "stylers":[{"visibility":"off"}]},
+          {"featureType":"road",
+          "stylers":[{"visibility":"on"}]}
+       ]
+
+
+        map1.set('styles', styles);
+        map2.set('styles', overlayStyles);
+        $('#map_canvas2').css('background','transparent')
+
+
+        }
+
+      function swap(){
+        $('#map_canvas1').children().fadeOut('slow')
+        $('#map_canvas2').children().fadeIn('slow')
+        $('#map_canvas3').children().fadeIn('slow')
+      }
+
+      google.maps.event.addDomListener(window, 'load', initialize);
+
+      function setBind(thing, val){
+        console.log(thing,val)
+        if (val){
+          map1.bindTo(thing, map2)
+        } else{
+          map1.unbind(thing, map2)
+        }
+      }
+
+    </script>
+  </head>
+  <body>
+    <input type="checkbox" id='zoomBinder' onchange="setBind('zoom', this.checked)">Bind to Zoom<br>
+    <input type="checkbox" onchange="setBind('center', this.checked)">Bind to Pan<br>
+    <div id="map_canvas1"></div>
+    <div id="map_canvas2"></div>
+  </body>
+</html>
+
