@@ -1,0 +1,122 @@
+
+<!DOCTYPE html>
+<html>
+  <head>
+
+  <title>Fade some labels in</title>
+  <meta name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta charset="UTF-8">
+  <style type="text/css">
+    html, body{
+      margin: 0;
+      padding: 0;
+      height: 100%;
+    }
+    #map_canvas1, #map_canvas2{
+      height:500px;
+      width:500px;
+      position:absolute;
+      top:50px;
+      left:25px;
+    }
+    #labels{
+      font-weight:bold;
+      font-size:1.2em;
+      padding:25px;
+    }
+
+  </style>
+  <script type="text/javascript"
+      src="https://maps.googleapis.com/maps/api/js?sensor=false"></script>
+  <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script>
+  <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.18/jquery-ui.min.js"></script>
+
+  <script type="text/javascript">
+    var map1;
+    var map2;
+
+    var baseStyles = [
+      {
+        stylers: [
+          { saturation: -90 }
+        ]
+      },{
+        elementType: "labels",
+        stylers: [
+          { visibility: "off" }
+        ]
+     }
+   ]
+   var overlayStyles = [
+      {
+        elementType: "geometry",
+        stylers: [
+          { visibility: "off" },
+          { saturation: -100 }
+        ]
+      },{
+        featureType: "road",
+        stylers: [
+          { visibility: "simplified" }
+        ]
+      },{
+        featureType: "administrative",
+        elementType: "labels",
+        stylers: [
+          { visibility: "on" }
+        ]
+      }
+    ]
+
+  function initialize() {
+    var myOptions = {
+      zoom: 12,
+      center: new google.maps.LatLng(51.5, 0),
+      mapTypeId: google.maps.MapTypeId.ROADMAP
+    };
+    map1 = new google.maps.Map($('#map_canvas1')[0], myOptions);
+    map2 = new google.maps.Map($('#map_canvas2')[0], myOptions);
+
+    myOptions.center = new google.maps.LatLng(28.3,-81.7);
+    myOptions.zoom = 8;
+
+    map1.set('styles', baseStyles);
+    map2.set('styles', overlayStyles);
+
+    //instantiating the map seems to override transparent css
+    $('#map_canvas2').css('background','transparent')
+
+    layer_1 = new google.maps.FusionTablesLayer({
+      query: {
+        select: 'col0',
+        from: 628653
+      },
+      map: map1,
+      suppressInfoWindows: true
+    });
+
+    map1.bindTo('zoom',map2)
+    map1.bindTo('center',map2)
+
+  }
+
+  function setVisibility(val){
+    if (val){
+      $(map2.getDiv()).fadeIn('slow');
+    } else{
+      $(map2.getDiv()).fadeOut('slow');
+    }
+  }
+
+  google.maps.event.addDomListener(window, 'load', initialize);
+
+</script>
+  </head>
+  <body>
+    <div id="labels"><input type="checkbox" checked onchange="setVisibility(this.checked)" />labels and roads</div>
+    <div id="map_canvas1"></div>
+    <div id="map_canvas2"></div>
+  </body>
+</html>
+
