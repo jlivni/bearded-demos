@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Simple Map</title>
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
+    <meta charset="utf-8">
+    <style>
+      html, body, #map-canvas {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+      }
+    </style>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?v=3.exp&sensor=false&libraries=places"></script>
+    <script>
+
+
+function CoordMapType(tileSize) {
+  this.tileSize = tileSize;
+}
+
+CoordMapType.prototype.getTile = function(coord, zoom, ownerDocument) {
+  var bounds = getTileBounds(coord, zoom);
+  var ne = bounds.getNorthEast();
+  var sw = bounds.getSouthWest();
+  var panoUrl = 'http://www.panoramio.com/map/get_panoramas.php?callback=?';
+  var panoOptions = {
+    set: 'public',
+    from: '0',
+    to: '2', // # photos
+    minx: sw.lng(),
+    miny: sw.lat(),
+    maxx: ne.lng(),
+    maxy: ne.lat(),
+    size: 'medium'
+  };
+  var img = $('<img/>', {
+    id: [coord.x, coord.y, zoom].join('_')
+  });
+  $.getJSON(panoUrl, panoOptions, function(response) {
+    if (response.photos.length) {
+      img.attr('src', response.photos[0].photo_file_url);
+    }
+  });
+  return img[0];
+};
+
+getTileBounds = function(coord, zoom) {
+  var proj = map.getProjection();
+  var tileSize = 256 / Math.pow(2, zoom);
+  var tileBounds = new google.maps.LatLngBounds(
+    proj.fromPointToLatLng(new google.maps.Point(coord.x * tileSize, (coord.y + 1) * tileSize)),
+    proj.fromPointToLatLng(new google.maps.Point((coord.x + 1) * tileSize, coord.y * tileSize))
+  );
+  return tileBounds;
+};
+
+var styles = [
+  {
+    'stylers': [
+      { 'visibility': 'off' }
+    ]
+  },{
+    'featureType': 'water',
+    'elementType': 'geometry',
+    'stylers': [
+      { 'visibility': 'simplified' }
+    ]
+  },{
+    'featureType': 'road',
+    'stylers': [
+      { 'visibility': 'simplified' }
+    ]
+  },{
+    'elementType': 'labels',
+    'stylers': [
+      { 'visibility': 'on' }
+    ]
+  }
+];
+
+var map;
+function initialize() {
+  var mapOptions = {
+    zoom: 7,
+    center: new google.maps.LatLng(47.75, -122.5)
+  };
+  map = new google.maps.Map(document.getElementById('map-canvas'),
+      mapOptions);
+
+  var photoMap = new CoordMapType(new google.maps.Size(256, 256));
+  map.overlayMapTypes.insertAt(0, photoMap);
+
+   var styledMap = new google.maps.StyledMapType(styles,
+    {name: 'Styled Map'});
+
+  map.overlayMapTypes.insertAt(1, styledMap);
+
+  // autocomplete
+  var input = document.getElementById('searchTextField');
+  map.controls[google.maps.ControlPosition.TOP_RIGHT].push(input);
+  var autocomplete = new google.maps.places.Autocomplete(input);
+
+  autocomplete.bindTo('bounds', map);
+  google.maps.event.addListener(autocomplete, 'place_changed', function() {
+    var place = autocomplete.getPlace();
+    if (place.geometry.viewport) {
+      map.fitBounds(place.geometry.viewport);
+    } else {
+      map.setCenter(place.geometry.location);
+      map.setZoom(17);  // Why 17? Because it looks good.
+    }
+  });
+}
+
+google.maps.event.addDomListener(window, 'load', initialize);
+
+    </script>
+  </head>
+  <body>
+    <div id="map-canvas"></div>
+    <input id="searchTextField" type="text" size="50">
+  </body>
+</html>
