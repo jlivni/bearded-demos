@@ -47,7 +47,18 @@ CoordMapType.prototype.getTile = function(coord, zoom, ownerDocument) {
   });
   $.getJSON(panoUrl, panoOptions, function(response) {
     if (response.photos.length) {
-      img.attr('src', response.photos[0].photo_file_url);
+      // TODO real canvas cropping
+      // from http://stackoverflow.com/questions/318630/
+      $("<img/>") // Make in memory copy of image to avoid css issues
+        .attr("src", response.photos[0].photo_file_url)
+        .load(function() {
+          if (this.width > this.height) {
+            img.attr('height', '275')
+          } else {
+            img.attr('width', '275')
+          }
+          img.attr('src', response.photos[0].photo_file_url)
+      });
     }
   });
   return img[0];
