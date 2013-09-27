@@ -10,6 +10,13 @@
         padding: 0;
         height: 100%;
       }
+      input[type=text] {
+        margin: 10px;
+        height: 28px;
+        border: 0px;
+        font-size:1.0em;
+        padding-left: 10px;
+      }
     </style>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
     <script src="https://maps.googleapis.com/maps/api/js?v=3.exp&sensor=false&libraries=places"></script>
@@ -84,7 +91,8 @@ var map;
 function initialize() {
   var mapOptions = {
     zoom: 7,
-    center: new google.maps.LatLng(47.75, -122.5)
+    center: new google.maps.LatLng(48, -122),
+    mapTypeControl: false
   };
   map = new google.maps.Map(document.getElementById('map-canvas'),
       mapOptions);
