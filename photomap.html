@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Simple Map</title>
+    <title>Photomap</title>
     <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
     <meta charset="utf-8">
     <style>
@@ -79,6 +79,8 @@ CoordMapType.prototype.getTile = function(coord, zoom, ownerDocument) {
   $.getJSON(requestOptions.url, requestOptions.params, function(response) {
     var imgUrl = '';
     if ($('#provider').val() == 'instagram') {
+      // todo some kind of recursive (or reverse geocode to find a city) when zoomed out
+      // due to limited radius
       if (response.data[0]) {
         imgUrl = response.data[0].images.low_resolution.url;
       }
