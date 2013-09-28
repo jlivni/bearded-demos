@@ -17,9 +17,18 @@
         font-size:1.0em;
         padding-left: 10px;
       }
+      select {
+        font-size:1.0em;
+        color: #444;
+        margin: 10px;
+        width: 140px;
+        height: 34px;
+        overflow: hidden;
+        border: 1px solid #ccc;
+      }
     </style>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
-    <script src="https://maps.googleapis.com/maps/api/js?v=3.exp&sensor=false&libraries=places"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?v=3.exp&sensor=false&libraries=geometry,places"></script>
     <script>
 
 
@@ -27,39 +36,69 @@ function CoordMapType(tileSize) {
   this.tileSize = tileSize;
 }
 
-CoordMapType.prototype.getTile = function(coord, zoom, ownerDocument) {
+getImageRequest = function(coord, zoom) {
   var bounds = getTileBounds(coord, zoom);
   var ne = bounds.getNorthEast();
   var sw = bounds.getSouthWest();
-  var panoUrl = 'http://www.panoramio.com/map/get_panoramas.php?callback=?';
-  var panoOptions = {
-    set: 'public',
-    from: '0',
-    to: '2', // # photos
-    minx: sw.lng(),
-    miny: sw.lat(),
-    maxx: ne.lng(),
-    maxy: ne.lat(),
-    size: 'medium'
-  };
+
+  if ($('#provider').val() == 'instagram') {
+    var center = bounds.getCenter();
+    var url = 'https://api.instagram.com/v1/media/search?callback=?'
+    var params = {
+      //order: '-createdAt',
+      lat: center.lat(),
+      lng: center.lng(),
+      distance: google.maps.geometry.spherical.computeDistanceBetween (center, bounds.getNorthEast()) * .75,
+      client_id: '87acde4d18a248ad891bb6b1f0f75109'
+    }
+
+  } else {
+    var url = 'http://www.panoramio.com/map/get_panoramas.php?callback=?';
+    var params = {
+      set: 'public',
+      from: '0',
+      to: '2', // # photos
+      minx: sw.lng(),
+      miny: sw.lat(),
+      maxx: ne.lng(),
+      maxy: ne.lat(),
+      size: 'medium'
+    };
+  }
+  return {
+    url: url,
+    params: params
+  }
+}
+
+CoordMapType.prototype.getTile = function(coord, zoom, ownerDocument) {
+  var requestOptions = getImageRequest(coord, zoom) 
   var img = $('<img/>', {
     id: [coord.x, coord.y, zoom].join('_')
   });
-  $.getJSON(panoUrl, panoOptions, function(response) {
-    if (response.photos.length) {
-      // TODO real canvas cropping
-      // from http://stackoverflow.com/questions/318630/
-      $("<img/>") // Make in memory copy of image to avoid css issues
-        .attr("src", response.photos[0].photo_file_url)
-        .load(function() {
-          if (this.width > this.height) {
-            img.attr('height', '275')
-          } else {
-            img.attr('width', '275')
-          }
-          img.attr('src', response.photos[0].photo_file_url)
-      });
+  $.getJSON(requestOptions.url, requestOptions.params, function(response) {
+    var imgUrl = '';
+    if ($('#provider').val() == 'instagram') {
+      if (response.data[0]) {
+        imgUrl = response.data[0].images.low_resolution.url;
+      }
+    } else {
+      if (response.photos.length) {
+        imgUrl = response.photos[0].photo_file_url
+      }
     }
+    // TODO real canvas cropping
+    // from http://stackoverflow.com/questions/318630/
+    $("<img/>") // Make in memory copy of image to avoid css issues
+      .attr("src", imgUrl)
+      .load(function() {
+        if (this.width > this.height) {
+          img.attr('height', '275')
+        } else {
+          img.attr('width', '275')
+        }
+        img.attr('src', imgUrl)
+    });
   });
   return img[0];
 };
@@ -74,7 +113,24 @@ getTileBounds = function(coord, zoom) {
   return tileBounds;
 };
 
-var styles = [
+var baseStyle = [
+  {
+    "stylers": [
+      { "color": "#1d8080" },
+      { "visibility": "off" }
+    ]
+  },{
+    "featureType": "water",
+    "stylers": [
+      { "visibility": "on" },
+      { "color": "#808080" }
+    ]
+  }
+]
+
+
+
+var overlayStyle = [
   {
     'stylers': [
       { 'visibility': 'off' }
@@ -86,33 +142,47 @@ var styles = [
       { 'visibility': 'simplified' }
     ]
   },{
-    'featureType': 'road',
+    'featureType': 'road.arterial',
     'stylers': [
       { 'visibility': 'simplified' }
     ]
   },{
-    'elementType': 'labels',
+    'featureType': 'road.highway',
     'stylers': [
-      { 'visibility': 'on' }
+      { 'visibility': 'simplified' }
+    ]
+  },{
+    "featureType": "administrative",
+    "elementType": "labels.text.stroke",
+    "stylers": [
+      { "visibility": "on" },
+      { "lightness": 44 }
+    ]
+  },{
+    "featureType": "administrative",
+    "elementType": "labels.text.fill",
+    "stylers": [
+      { "lightness": -66 },
+      { "visibility": "on" }
     ]
   }
 ];
 
-var map;
+var map, photoMap;
 function initialize() {
   var mapOptions = {
     zoom: 7,
     center: new google.maps.LatLng(48, -122),
-    mapTypeControl: false
+    mapTypeControl: false,
+    styles: baseStyle
   };
   map = new google.maps.Map(document.getElementById('map-canvas'),
       mapOptions);
 
-  var photoMap = new CoordMapType(new google.maps.Size(256, 256));
+  photoMap = new CoordMapType(new google.maps.Size(256, 256));
   map.overlayMapTypes.insertAt(0, photoMap);
 
-   var styledMap = new google.maps.StyledMapType(styles,
-    {name: 'Styled Map'});
+  var styledMap = new google.maps.StyledMapType(overlayStyle);
 
   map.overlayMapTypes.insertAt(1, styledMap);
 
@@ -131,25 +201,37 @@ function initialize() {
       map.setZoom(17);  // Why 17? Because it looks good.
     }
   });
+
+  // image provider
+  var provider = $('#provider');
+  provider.change(function() {
+    map.overlayMapTypes.removeAt(0)
+    map.overlayMapTypes.insertAt(0, photoMap);
+  });
+  map.controls[google.maps.ControlPosition.RIGHT_TOP].push($('#provider')[0]);
 }
 
 google.maps.event.addDomListener(window, 'load', initialize);
 
+// analytics
+var _gaq = _gaq || [];
+_gaq.push(['_setAccount', 'UA-34211895-1']);
+_gaq.push(['_trackPageview']);
 
-  var _gaq = _gaq || [];
-  _gaq.push(['_setAccount', 'UA-34211895-1']);
-  _gaq.push(['_trackPageview']);
-
-  (function() {
-    var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
-    ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
-    var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
-  })();
+(function() {
+  var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+  ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+  var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+})();
 
     </script>
   </head>
   <body>
     <div id="map-canvas"></div>
+    <select id="provider">
+      <option value="panoramio">panoramio
+      <option value="instagram">instagram
+    </select>
     <input id="searchTextField" type="text" size="50">
   </body>
 </html>
