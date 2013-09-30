@@ -26,6 +26,12 @@
         overflow: hidden;
         border: 1px solid #ccc;
       }
+      #copyright {
+        opacity:.8;
+        background:white;
+        padding:1px 3px 1px 3px;
+        color: #444;
+      }
     </style>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
     <script src="https://maps.googleapis.com/maps/api/js?v=3.exp&sensor=false&libraries=geometry,places"></script>
@@ -207,10 +213,19 @@ function initialize() {
   // image provider
   var provider = $('#provider');
   provider.change(function() {
+    if ($('#provider').val() == 'instagram') {
+      var copyright = "This product uses the Instagram API but is not endorsed or certified by Instagram.";
+    } else {
+      var copyright = "Photos provided by Panoramio are under the copyright of their owners";
+    }
+    $('#copyright').html(copyright);
     map.overlayMapTypes.removeAt(0)
     map.overlayMapTypes.insertAt(0, photoMap);
   });
   map.controls[google.maps.ControlPosition.RIGHT_TOP].push($('#provider')[0]);
+
+  // copyright
+  map.controls[google.maps.ControlPosition.BOTTOM_RIGHT].push($('#copyright')[0]);
 }
 
 google.maps.event.addDomListener(window, 'load', initialize);
@@ -235,5 +250,8 @@ _gaq.push(['_trackPageview']);
       <option value="instagram">instagram
     </select>
     <input id="searchTextField" type="text" size="50">
+    <div id="copyright">
+      Photos provided by Panoramio are under the copyright of their owners
+    </div>
   </body>
 </html>
