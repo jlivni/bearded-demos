@@ -63,7 +63,7 @@ getImageRequest = function(coord, zoom) {
     var params = {
       set: 'public',
       from: '0',
-      to: '2', // # photos
+      to: '5', // # photos
       minx: sw.lng(),
       miny: sw.lat(),
       maxx: ne.lng(),
@@ -84,15 +84,18 @@ CoordMapType.prototype.getTile = function(coord, zoom, ownerDocument) {
   });
   $.getJSON(requestOptions.url, requestOptions.params, function(response) {
     var imgUrl = '';
+    var imageNum = Math.floor(Math.random() * 6) // select any of first 5 images
     if ($('#provider').val() == 'instagram') {
       // todo some kind of recursive (or reverse geocode to find a city) when zoomed out
       // due to limited radius
       if (response.data[0]) {
-        imgUrl = response.data[0].images.low_resolution.url;
+        var imageNum = Math.floor(Math.random() * response.data.length) // random
+        imgUrl = response.data[imageNum].images.low_resolution.url;
       }
     } else {
-      if (response.photos.length) {
-        imgUrl = response.photos[0].photo_file_url
+    if (response.photos.length) {
+        var imageNum = Math.floor(Math.random() * response.photos.length) // random
+        imgUrl = response.photos[imageNum].photo_file_url;
       }
     }
     // TODO real canvas cropping
