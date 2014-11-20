@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
+    <meta charset="utf-8">
+    <title>Rectangles</title>
+    <style>
+      html, body, #map-canvas {
+        height: 100%;
+        margin: 0px;
+        padding: 0px
+      }
+    </style>
+    <script src="https://maps.googleapis.com/maps/api/js?v=3.exp&libararies=places,geometry"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+    <script>
+// Adds an 8km rectangle when map is clicked.
+var map;
+var rectangle;
+var DEFAULT_RADIUS_ = 8000;
+
+function initialize() {
+  map = new google.maps.Map(document.getElementById('map-canvas'), {
+    zoom: 12,
+    center: {lat: 38.55, lng: -121.78},
+    mapTypeId: google.maps.MapTypeId.HYBRID
+  });
+
+  rectangle = new google.maps.Rectangle({
+    strokeColor: '#FF0000',
+    fillColor: '#FFF',
+    fillOpacity: 0.3,
+    clickable: false,
+    map: map
+  });
+
+  map.addListener('click', setRectangle)
+};
+
+function setRectangle(event) {
+  var circle = new google.maps.Circle({
+    center: event.latLng,
+    radius: parseInt($('#radius').val(), 10) || DEFAULT_RADIUS_
+  });
+  rectangle.set('bounds', circle.getBounds());
+  console.log(event.latLng.toString())
+  console.log(circle.getBounds().toString())
+}
+google.maps.event.addDomListener(window, 'load', initialize);
+
+    </script>
+  </head>
+  <body>
+    <div id="map-canvas"></div>
+    <input id="radius" type=text value=8000 placeholder="radius in meters"></input>
+  </body>
+</html>
