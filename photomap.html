@@ -34,7 +34,7 @@
       }
     </style>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
-    <script src="https://maps.googleapis.com/maps/api/js?v=3.exp&sensor=false&libraries=geometry,places"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?v=3.exp&libraries=geometry,places&key=AIzaSyDX53QxmLHQusdMpsxQuDOSBcMYIRnMOSk"></script>
     <script>
 
 
@@ -47,30 +47,16 @@ getImageRequest = function(coord, zoom) {
   var ne = bounds.getNorthEast();
   var sw = bounds.getSouthWest();
 
-  if ($('#provider').val() == 'instagram') {
-    var center = bounds.getCenter();
-    var url = 'https://api.instagram.com/v1/media/search?callback=?'
-    var params = {
-      //order: '-createdAt',
-      lat: center.lat(),
-      lng: center.lng(),
-      distance: google.maps.geometry.spherical.computeDistanceBetween (center, bounds.getNorthEast()) * .75,
-      client_id: '87acde4d18a248ad891bb6b1f0f75109'
-    }
-
-  } else {
-    var url = 'http://www.panoramio.com/map/get_panoramas.php?callback=?';
-    var params = {
-      set: 'public',
-      from: '0',
-      to: '5', // # photos
-      minx: sw.lng(),
-      miny: sw.lat(),
-      maxx: ne.lng(),
-      maxy: ne.lat(),
-      size: 'medium'
-    };
+  var center = bounds.getCenter();
+  var url = 'https://api.instagram.com/v1/media/search?callback=?'
+  var params = {
+    //order: '-createdAt',
+    lat: center.lat(),
+    lng: center.lng(),
+    distance: google.maps.geometry.spherical.computeDistanceBetween (center, bounds.getNorthEast()) * .75,
+    access_token: getAccessToken()
   }
+
   return {
     url: url,
     params: params
@@ -180,7 +166,16 @@ var overlayStyle = [
 ];
 
 var map, photoMap;
+function getAccessToken() {
+  if (window.location.hash && window.location.hash.substring(1,13) == 'access_token') {
+    return window.location.hash.substring(14);
+  }
+}
+
 function initialize() {
+  if (!getAccessToken()) {
+    window.location = 'https://api.instagram.com/oauth/authorize/?client_id=87acde4d18a248ad891bb6b1f0f75109&redirect_uri=http://jlivni.github.io/bearded-demos/photomap.html&response_type=token&scope=public_content'
+  }
   var mapOptions = {
     zoom: 7,
     center: new google.maps.LatLng(48, -122),
@@ -249,12 +244,8 @@ _gaq.push(['_trackPageview']);
   <body>
     <div id="map-canvas"></div>
     <select id="provider">
-      <option value="panoramio">panoramio
       <option value="instagram">instagram
     </select>
     <input id="searchTextField" type="text" size="50">
-    <div id="copyright">
-      Photos provided by Panoramio are under the copyright of their owners
-    </div>
   </body>
 </html>
