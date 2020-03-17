@@ -1,0 +1,65 @@
+
+<html>
+  <head>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta http-equiv="refresh" content="600">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+    <script>
+      $( document ).ready(function() {
+        setInterval(updateImages, 1000 * 30);
+      });
+
+      const updateImages = () => {
+        $('img').each(function() {
+            var jqt = $(this);
+            var src = jqt.attr('src');
+            src = src.substr(0,src.indexOf('?'));
+            console.log(src)
+            src += '?_ts=' + new Date().getTime();
+            jqt.attr('src',src);
+        });
+      };
+
+    </script>
+
+
+  </head>
+  <body>
+    <div class="container">
+      <div class="row">
+        <div class="col">
+          <img src="http://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50attwinbridges/hwy50attwinbridges.jpg?"><br>
+          <a class="twitter-timeline" data-width="300" data-height="300" href="https://twitter.com/CaltransDist3?ref_src=twsrc%5Etfw">Tweets by Sierra_at_Tahoe</a> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
+        </div>
+        <div class="col">
+          <img src="http://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50atsierraeb/hwy50atsierraeb.jpg?"><br>
+          <a class="twitter-timeline" data-width="300" data-height="300" href="https://twitter.com/Sierra_at_Tahoe?ref_src=twsrc%5Etfw">Tweets by Sierra_at_Tahoe</a> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col">
+          <img src="https://www.sierraattahoe.com/cams/grandview.jpg?" height=500 width=800>
+        </div>
+        <div class="col">
+          <img src="https://www.sierraattahoe.com/cams/huckleberry.jpg?">
+        </div>
+        <div class="col">
+          <img src="https://www.sierraattahoe.com/cams/westbowl.jpg?">
+        </div>
+      </div>
+        <a href="https://www.wunderground.com/hourly/us/ca/twin-bridges/KCATWINB8">Wunderground</a>
+<br>
+        <a href="https://www.sierraattahoe.com/weather-snow-report/">Sierra Report</a>
+<br>
+        <a href="https://opensnow.com/dailysnow/tahoe">Open Snow</a>
+        </div>
+      </div>
+    </div>
+    <br>
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+  </body>
+</html>
+
