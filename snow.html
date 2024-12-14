@@ -1,93 +1,200 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
 
 <head>
-  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
-    integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
-  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-  <meta http-equiv="refresh" content="600">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dynamic Webcam Dashboard</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
-  <script>
-    $(document).ready(function () {
-      setInterval(updateImages, 1000 * 15);
-    });
+  <style>
+    body {
+      background-color: #f5f5f5;
+    }
 
-    const updateImages = () => {
-      $('img').each(function () {
-        var jqt = $(this);
-        var src = jqt.attr('src');
-        src = src.substr(0, src.indexOf('?'));
-        console.log(src)
-        src += '?_ts=' + new Date().getTime();
-        jqt.attr('src', src);
-      });
+    .navbar {
+      background-color: #00d1b2;
+    }
+
+    .webcam-image {
+      margin-bottom: 20px;
+    }
+
+    .footer {
+      text-align: center;
+      padding: 20px;
+      background-color: #00d1b2;
+      color: white;
+    }
+    .container {
+        max-width:100% !important;
+    }
+  </style>
+  <script>
+    const configs = {
+      northlake: {
+        links: {
+          "Wunderground": "https://www.wunderground.com/hourly/us/ca/soda-springs/KCASODAS17",
+          "Sierra Report": "https://www.sierraattahoe.com/weather-snow-report/",
+          "Open Snow": "https://opensnow.com/dailysnow/tahoe",
+          "Sciots Webcam": "http://sciotscamp.org/index.php/webcam/"
+        },
+        webcam_urls: [
+          "https://cwwp2-ssl.dot.ca.gov/data/d3/cctv/image/hwy80atwhitmoregrade/hwy80atwhitmoregrade.jpg",
+          "https://cwwp2-ssl.dot.ca.gov/data/d3/cctv/image/hwy80atkingvalewb/hwy80atkingvalewb.jpg",
+          "https://cwwp2-ssl.dot.ca.gov/data/d3/cctv/image/hwy80atcastlepeak/hwy80atcastlepeak.jpg",
+          "https://cwwp2-ssl.dot.ca.gov/data/d3/cctv/image/hwy80atdonnersummit/hwy80atdonnersummit.jpg",
+        ],
+        tweets: [
+          "https://twitter.com/CaltransDist3",
+          "https://twitter.com/sugarbowlresort",
+          "https://twitter.com/alpine_meadows"
+        ]
+      },
+      southlake: {
+        links: {
+          "Wunderground": "https://www.wunderground.com/hourly/us/ca/twin-bridges/KCATWINB8",
+          "Open Snow": "https://opensnow.com/dailysnow/tahoe",
+        },
+        webcam_urls: [
+          "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50attwinbridges/hwy50attwinbridges.jpg?",
+          "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50atechosummit/hwy50atechosummit.jpg?",
+          "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50atmeyers/hwy50atmeyers.jpg?",
+          "https://dirigo-ftp-sierra-webcams-prod-01.azurewebsites.net/webcam/grandview.jpg?",
+          "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50atsierraeb/hwy50atsierraeb.jpg?",
+        ],
+        tweets: [
+          "https://twitter.com/CaltransDist3",
+          "https://twitter.com/Sierra_at_Tahoe",
+          "https://twitter.com/HVconditions"
+        ]
+      }
     };
 
+    let currentConfig = 'northlake';
+
+    function renderPage(configKey) {
+      const config = configs[configKey];
+
+      // Clear existing content
+      $("#links-container").empty();
+      $("#webcam-container").empty();
+      $("#tweets-container").empty();
+
+      // Update Links
+      for (const [title, url] of Object.entries(config.links)) {
+        $("#links-container").append(`<a class="navbar-item button is-link is-light mx-1" href="${url}" target="_blank">${title}</a>`);
+      }
+
+      // Update Webcams (First Two)
+      config.webcam_urls.slice(0, 2).forEach((url, index) => {
+        $("#webcam-container").append(`
+          <div class="column is-half">
+            <figure class="image is-4by3 webcam-image">
+              <img src="${url}" alt="Webcam ${index + 1}">
+            </figure>
+          </div>
+        `);
+      });
+
+      // Update Tweets with delay
+      config.tweets.forEach((tweet, i) => {
+        setTimeout(() => {
+          $("#tweets-container").append(`
+            <div class="column is-one-third">
+              <a class="twitter-timeline"
+                href="${tweet}"
+                data-tweet-limit="5"
+                data-chrome="noheader nofooter noborders transparent"
+                data-width="300"
+                data-height="300">
+                Tweets by ${tweet.split('/').pop()}
+              </a>
+            </div>
+          `);
+          // Reinitialize Twitter widgets after delay
+          if (i === config.tweets.length - 1) {
+            setTimeout(() => {
+              twttr.widgets.load();
+            }, 500);
+          }
+        }, i * 1000); // Stagger tweets every 1 second
+      });
+
+      // Update Remaining Webcams
+      config.webcam_urls.slice(2).forEach((url, index) => {
+        $("#webcam-container").append(`
+          <div class="column is-one-third">
+            <figure class="image is-4by3 webcam-image">
+              <img src="${url}" alt="Webcam ${index + 3}">
+            </figure>
+          </div>
+        `);
+      });
+
+      // Initialize Twitter Widgets
+      const script = document.createElement("script");
+      script.src = "https://platform.twitter.com/widgets.js";
+      script.async = true;
+      document.body.appendChild(script);
+
+      // Update Dropdown Label
+      $("#current-config").text(configKey.charAt(0).toUpperCase() + configKey.slice(1));
+    }
+
+    $(document).ready(function () {
+      // Render Initial Config
+      renderPage(currentConfig);
+
+      // Dropdown Change Event
+      $("#config-selector").change(function () {
+        currentConfig = $(this).val();
+        renderPage(currentConfig);
+      });
+
+      // Webcam auto-refresh
+      setInterval(() => {
+        $("img").each(function () {
+          const $img = $(this);
+          const src = $img.attr("src").split("?")[0];
+          $img.attr("src", `${src}?_ts=${new Date().getTime()}`);
+        });
+      }, 1000 * 15);
+    });
   </script>
 </head>
 
 <body>
+  <!-- Navbar -->
+  <nav class="navbar has-background-white" role="navigation" aria-label="main navigation">
+    <span id="links-container" class="buttons my-4 has-text-centered">
+      <!-- Links will be inserted here dynamically -->
+    </span>
+    <div class="navbar-end">
+        <div class="navbar-item">
+        <div class="select">
+          <select id="config-selector">
+            <option value="northlake">Northlake</option>
+            <option value="southlake">Southlake</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </nav>
+
   <div class="container">
-    <div class="row">
-      <button type="button" class="btn btn-link"><a
-          href="https://www.wunderground.com/hourly/us/ca/twin-bridges/KCATWINB8">Wunderground</a></button>
-      <button type="button" class="btn btn-link"><a href="https://www.sierraattahoe.com/weather-snow-report/">Sierra
-          Report</a></button>
-      <button type="button" class="btn btn-link"><a href="https://opensnow.com/dailysnow/tahoe">Open Snow</a></button>
-      <button type="button" class="btn btn-link"><a href="http://sciotscamp.org/index.php/webcam/">Sciots
-          Webcam</a></button>
+
+    <!-- Webcam Section -->
+    <div id="webcam-container" class="columns is-multiline">
+      <!-- First two webcams will be inserted here dynamically -->
     </div>
-    <div class="row">
-      <div class="col">
-        <img src="https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50attwinbridges/hwy50attwinbridges.jpg?" height=400><br>
-      </div>
-      <div class="col">
-        <img src="https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50atmeyers/hwy50atmeyers.jpg?" height=400><br>
-      </div>
-    </div>
-    <div class="row">
-      <div class="col-md-4">
-        <a class="twitter-timeline" data-width="300" data-height="300"
-          href="https://twitter.com/CaltransDist3?ref_src=twsrc%5Etfw">Caltrans 3</a>
-        <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
-      </div>
-      <div class="col-md-4">
-        <a class="twitter-timeline" data-width="300" data-height="300"
-          href="https://twitter.com/Sierra_at_Tahoe?ref_src=twsrc%5Etfw">Sierra_at_Tahoe</a>
-        <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
-      </div>
-      <div class="col-md-4">
-        <a class="twitter-timeline" data-width="300" data-height="300"
-          href="https://twitter.com/HVconditions?ref_src=twsrc%5Etfw">Heavenly Conditions</a>
-        <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
-      </div>
-    </div>
-    <div class="row">
-      <div class="col">
-        <img src="http://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50atsierraeb/hwy50atsierraeb.jpg?" height=400><br>
-      </div>
-      <div class="col">
-        <img src="http://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50atechosummit/hwy50atechosummit.jpg?" height=400><br>
-      </div>
-    <div class="row">
-      <div class="col">
-        <img src="https://cwwp2-ssl.dot.ca.gov/data/d3/cctv/image/hwy80atkingvalewb/hwy80atkingvalewb.jpg" height=400><br>
-      </div>
-      <div class="col-md-6">
-        <img src="https://dirigo-ftp-sierra-webcams-prod-01.azurewebsites.net/webcam/grandview.jpg?" height=400>
-      </div>
+
+    <!-- Twitter Feeds Section -->
+    <div id="tweets-container" class="columns is-multiline my-4">
+      <!-- Twitter feeds will be inserted here dynamically -->
     </div>
   </div>
-  </div>
-  <br>
-  <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"
-    integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo"
-    crossorigin="anonymous"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"
-    integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1"
-    crossorigin="anonymous"></script>
-  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"
-    integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM"
-    crossorigin="anonymous"></script>
+
 </body>
 
 </html>
