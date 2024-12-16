@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dynamic Webcam Dashboard</title>
+  <title>SNOW</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
   <style>
@@ -35,9 +35,9 @@
       northlake: {
         links: {
           "Wunderground": "https://www.wunderground.com/hourly/us/ca/soda-springs/KCASODAS17",
-          "Sierra Report": "https://www.sierraattahoe.com/weather-snow-report/",
           "Open Snow": "https://opensnow.com/dailysnow/tahoe",
-          "Sciots Webcam": "http://sciotscamp.org/index.php/webcam/"
+          "Sugarbowl": "https://www.sugarbowl.com/conditions",
+          "Caltrans 80": "https://roads.dot.ca.gov/?roadnumber=80",
         },
         webcam_urls: [
           "https://cwwp2-ssl.dot.ca.gov/data/d3/cctv/image/hwy80atwhitmoregrade/hwy80atwhitmoregrade.jpg",
@@ -55,6 +55,9 @@
         links: {
           "Wunderground": "https://www.wunderground.com/hourly/us/ca/twin-bridges/KCATWINB8",
           "Open Snow": "https://opensnow.com/dailysnow/tahoe",
+          "Sierra Report": "https://www.sierraattahoe.com/weather-snow-report/",
+          "Sciots Webcam": "http://sciotscamp.org/index.php/webcam/",
+          "Caltrans 50": "https://roads.dot.ca.gov/?roadnumber=50"
         },
         webcam_urls: [
           "https://cwwp2.dot.ca.gov/data/d3/cctv/image/hwy50attwinbridges/hwy50attwinbridges.jpg?",
@@ -131,7 +134,6 @@
           </div>
         `);
       });
-
       // Initialize Twitter Widgets
       const script = document.createElement("script");
       script.src = "https://platform.twitter.com/widgets.js";
@@ -143,24 +145,30 @@
     }
 
     $(document).ready(function () {
-      // Render Initial Config
-      renderPage(currentConfig);
+    // Render Initial Config
+    renderPage(currentConfig);
 
-      // Dropdown Change Event
-      $("#config-selector").change(function () {
-        currentConfig = $(this).val();
+    // Button Click Events for Northlake and Southlake
+    $("#northlake-btn").click(function () {
+        currentConfig = 'northlake';
         renderPage(currentConfig);
-      });
-
-      // Webcam auto-refresh
-      setInterval(() => {
-        $("img").each(function () {
-          const $img = $(this);
-          const src = $img.attr("src").split("?")[0];
-          $img.attr("src", `${src}?_ts=${new Date().getTime()}`);
-        });
-      }, 1000 * 15);
     });
+
+    $("#southlake-btn").click(function () {
+        currentConfig = 'southlake';
+        renderPage(currentConfig);
+    });
+
+    // Webcam auto-refresh
+    setInterval(() => {
+        $("img").each(function () {
+        const $img = $(this);
+        const src = $img.attr("src").split("?")[0];
+        $img.attr("src", `${src}?_ts=${new Date().getTime()}`);
+        });
+    }, 1000 * 15);
+    });
+
   </script>
 </head>
 
@@ -172,13 +180,9 @@
     </span>
     <div class="navbar-end">
         <div class="navbar-item">
-        <div class="select">
-          <select id="config-selector">
-            <option value="northlake">Northlake</option>
-            <option value="southlake">Southlake</option>
-          </select>
+            <button id="northlake-btn" class="button is-light mx-1">Northlake</button>
+            <button id="southlake-btn" class="button is-light mx-1">Southlake</button>
         </div>
-      </div>
     </div>
   </nav>
 
