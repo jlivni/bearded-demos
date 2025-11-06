@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Timeline (15-minute bins)</title>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+  <style>
+    :root {
+      --bg: #0b0f14;
+      --panel: #121821;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --brand: #60a5fa;
+    }
+    html, body { height: 100%; }
+    body {
+      margin: 0; padding: 24px; background: var(--bg); color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    }
+    .wrap { max-width: 1200px; margin: 0 auto; }
+    h1 { font-size: 18px; margin: 0 0 12px 0; font-weight: 600; letter-spacing: 0.2px; }
+    .controls {
+      display: grid; gap: 10px; grid-template-columns: 1fr auto auto auto auto auto;
+      align-items: center; background: var(--panel); border-radius: 10px; padding: 12px;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+    .controls label { font-size: 12px; color: var(--muted); }
+    .controls input[type="number"], .controls select {
+      background: #0f141c; color: var(--text); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px; padding: 6px 8px; width: 100px;
+    }
+    .controls input[type="file"] { color: var(--muted); }
+    .controls button {
+      background: linear-gradient(180deg, #3b82f6, #2563eb);
+      color: white; border: 0; border-radius: 9px; padding: 8px 12px; font-weight: 600;
+      letter-spacing: .2px; cursor: pointer;
+    }
+    .controls button.secondary { background: #1f2937; }
+    .status { font-size: 12px; color: var(--muted); margin-top: 8px; }
+    .status.error { color: #fca5a5; }
+    #chart { height: 520px; margin-top: 14px; background: var(--panel); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; }
+    .hint { font-size: 12px; color: var(--muted); margin-top: 10px; }
+  </style>
+  <noscript>Please enable JavaScript.</noscript>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Timeline (15-minute increments)</h1>
+    <div class="controls">
+      <div>
+        <label>Load time.csv</label><br />
+        <input id="file" type="file" accept=".csv,.txt,.json" />
+      </div>
+      <div>
+        <label>Assumed year</label><br />
+        <input id="year" type="number" min="2000" max="2100" value="2025" />
+      </div>
+      <div>
+        <label>Bin size</label><br />
+        <select id="bin">
+          <option value="15" selected>15 min</option>
+          <option value="5">5 min</option>
+          <option value="30">30 min</option>
+          <option value="60">60 min</option>
+        </select>
+      </div>
+      <div>
+        <label>Start datetime</label><br />
+        <input id="startDT" type="datetime-local" />
+      </div>
+      <div>
+        <label>End datetime</label><br />
+        <input id="endDT" type="datetime-local" />
+      </div>
+      <div style="display:flex; gap:8px; align-items:end;">
+        <button id="update">Update</button>
+        <button id="download" class="secondary">Download PNG</button>
+      </div>
+    </div>
+    <div id="status" class="status">No data loaded.</div>
+    <div id="chart"></div>
+    <div class="hint">Tip: Open this file in a browser, load your <code>time.csv</code>, tweak Start/End if desired, then click Update or Download PNG (or just screenshot).</div>
+  </div>
+
+  <script>
+    const months = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+    const $ = sel => document.querySelector(sel);
+    const chart = echarts.init(document.getElementById('chart'), null, {renderer: 'canvas'});
+
+    let rawText = '';
+    let records = [];
+
+    function parsePythonListOfDicts(text) {
+      // Convert Python-like list of dicts to JSON.
+      // Assumes single quotes and simple string values.
+      const jsonish = text
+        .trim()
+        .replace(/\bNone\b/g, 'null')
+        .replace(/'/g, '"');
+      return JSON.parse(jsonish);
+    }
+
+    // Minimal CSV parser that handles quoted fields and commas inside quotes
+    function parseCSVRows(text) {
+      const rows = [];
+      let row = [];
+      let cur = '';
+      let inQuotes = false;
+      for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        if (ch === '"') {
+          if (inQuotes && text[i+1] === '"') { cur += '"'; i++; }
+          else { inQuotes = !inQuotes; }
+        } else if (ch === ',' && !inQuotes) {
+          row.push(cur); cur = '';
+        } else if ((ch === '\n' || ch === '\r') && !inQuotes) {
+          if (ch === '\r' && text[i+1] === '\n') { i++; }
+          row.push(cur); cur = '';
+          // skip empty trailing lines
+          if (row.some(c => c.trim() !== '')) rows.push(row);
+          row = [];
+        } else {
+          cur += ch;
+        }
+      }
+      if (cur.length || row.length) {
+        row.push(cur);
+        if (row.some(c => c.trim() !== '')) rows.push(row);
+      }
+      return rows;
+    }
+
+    function parseCsvRecords(text) {
+      const rows = parseCSVRows(text);
+      if (!rows.length) return [];
+      const out = [];
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i];
+        if (!r || r.length < 3) continue;
+        const id = (r[0] ?? '').trim(); // not currently used; kept for future
+        const dt = (r[1] ?? '').trim();
+        const itime = (r[2] ?? '').trim();
+        if (dt || itime) out.push({ id, dt, itime });
+      }
+      return out;
+    }
+
+    function parseRecords(text) {
+      const trimmed = text.trim();
+      if (trimmed.startsWith('[')) {
+        const arr = parsePythonListOfDicts(trimmed);
+        return arr.map(o => ({ dt: o.dt ?? o["dt"], itime: o.itime ?? o["itime"] }));
+      }
+      return parseCsvRecords(text);
+    }
+
+    function toDate(dtStr, timeStr, year) {
+      if (!dtStr || dtStr.toUpperCase() === 'UNKNOWN') return null;
+      const [dayS, monS] = dtStr.split('/');
+      const day = parseInt(dayS, 10);
+      const mon = (months[(monS || '').toLowerCase()] ?? null);
+      if (mon == null) return null;
+      const [hhS, mmS] = timeStr.split(':');
+      const hh = parseInt(hhS, 10) || 0;
+      const mm = parseInt(mmS, 10) || 0;
+      return new Date(year, mon, day, hh, mm, 0, 0);
+    }
+
+    function floorToBin(date, minutes) {
+      const ms = date.getTime();
+      const binMs = minutes * 60 * 1000;
+      return new Date(Math.floor(ms / binMs) * binMs);
+    }
+
+    function ceilToBin(date, minutes) {
+      const ms = date.getTime();
+      const binMs = minutes * 60 * 1000;
+      return new Date(Math.ceil(ms / binMs) * binMs);
+    }
+
+    function formatBinLabel(d) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth()+1).padStart(2,'0');
+      const day = String(d.getDate()).padStart(2,'0');
+      const hh = String(d.getHours()).padStart(2,'0');
+      const mm = String(d.getMinutes()).padStart(2,'0');
+      return `${y}-${m}-${day} ${hh}:${mm}`;
+    }
+
+    function buildBins(dates, binMinutes) {
+      if (!dates.length) return {labels: [], counts: [], start: null, end: null};
+      const start = floorToBin(new Date(Math.min(...dates.map(d => d.getTime()))), binMinutes);
+      const end = ceilToBin(new Date(Math.max(...dates.map(d => d.getTime()))), binMinutes);
+      const labels = [];
+      const counts = [];
+      const index = new Map();
+      for (let t = new Date(start); t < end; t = new Date(t.getTime() + binMinutes*60*1000)) {
+        const lbl = formatBinLabel(t);
+        index.set(t.getTime(), labels.length);
+        labels.push(lbl);
+        counts.push(0);
+      }
+      const binMs = binMinutes * 60 * 1000;
+      for (const d of dates) {
+        const b = Math.floor(d.getTime() / binMs) * binMs;
+        const i = index.get(b);
+        if (i != null) counts[i] += 1;
+      }
+      return {labels, counts, start, end};
+    }
+
+    function buildBinsInRange(start, end, binMinutes, dates) {
+      if (!start || !end) return {labels: [], counts: []};
+      const labels = [];
+      const counts = [];
+      const index = new Map();
+      for (let t = new Date(start); t <= end; t = new Date(t.getTime() + binMinutes*60*1000)) {
+        const lbl = formatBinLabel(t);
+        index.set(t.getTime(), labels.length);
+        labels.push(lbl);
+        counts.push(0);
+      }
+      const binMs = binMinutes * 60 * 1000;
+      for (const d of dates) {
+        const ms = d.getTime();
+        if (ms < start.getTime() || ms > end.getTime()) continue;
+        const b = Math.floor(ms / binMs) * binMs;
+        const i = index.get(b);
+        if (i != null) counts[i] += 1;
+      }
+      return {labels, counts};
+    }
+
+    function toInputValue(d) {
+      const pad2 = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+    }
+
+    function generateSmoothShadingAreas(labels, dayStart, dayEnd, eveningEnd) {
+      if (!labels.length) return [];
+      const parseLbl = s => {
+        const [datePart, timePart] = s.split(' ');
+        const [Y,M,D] = datePart.split('-').map(n => parseInt(n,10));
+        const [h,m] = timePart.split(':').map(n => parseInt(n,10));
+        return new Date(Y, M-1, D, h, m);
+      };
+      const startDate = parseLbl(labels[0]);
+      const endDate = parseLbl(labels[labels.length-1]);
+
+      // Map time of day to blend value v in [0,1] (0=night black, 1=day light blue)
+      function phaseValue(d) {
+        const t = d.getHours() + d.getMinutes() / 60;
+        if (t < 5) return 0;                         // deep night
+        if (t < dayStart) return (t - 5) / (dayStart - 5); // dawn ramp 5 → dayStart
+        if (t < dayEnd) return 1;                     // day plateau
+        if (t < eveningEnd) return 1 - (t - dayEnd) / (eveningEnd - dayEnd); // dusk ramp
+        return 0;                                     // night
+      }
+
+      function mixColor(nightRGB, dayRGB, v, alpha) {
+        const r = Math.round(nightRGB[0] * (1 - v) + dayRGB[0] * v);
+        const g = Math.round(nightRGB[1] * (1 - v) + dayRGB[1] * v);
+        const b = Math.round(nightRGB[2] * (1 - v) + dayRGB[2] * v);
+        return `rgba(${r},${g},${b},${alpha})`;
+      }
+
+      const areas = [];
+      const stepMin = 30; // smooth shading in 30-min steps
+      const nightRGB = [0,0,0];
+      const dayRGB = [219, 234, 254]; // light blue
+      const alpha = 0.22; // constant transparency
+
+      // Iterate every step across the full date span
+      const spanStart = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 0, 0);
+      const spanEnd = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), 23, 59);
+      for (let cur = new Date(spanStart); cur < spanEnd; cur = new Date(cur.getTime() + stepMin*60*1000)) {
+        const nxt = new Date(cur.getTime() + stepMin*60*1000);
+        const v = phaseValue(cur);
+        const color = mixColor(nightRGB, dayRGB, v, alpha);
+        const startLbl = formatBinLabel(floorToBin(cur, 1));
+        const endLbl = formatBinLabel(floorToBin(nxt, 1));
+        areas.push([{ xAxis: startLbl }, { xAxis: endLbl, itemStyle: { color } }]);
+      }
+      return areas;
+    }
+
+    function generatePhaseShadingAreas(labels) {
+      // Constant blocks with no intra-day variation
+      if (!labels.length) return [];
+      const parseLbl = s => {
+        const [datePart, timePart] = s.split(' ');
+        const [Y,M,D] = datePart.split('-').map(n => parseInt(n,10));
+        const [h,m] = timePart.split(':').map(n => parseInt(n,10));
+        return new Date(Y, M-1, D, h, m);
+      };
+      const startDate = parseLbl(labels[0]);
+      const endDate = parseLbl(labels[labels.length-1]);
+      const areas = [];
+      for (let cur = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()); cur <= endDate; cur = new Date(cur.getTime() + 24*60*60*1000)) {
+        const mk = (h) => new Date(cur.getFullYear(),cur.getMonth(),cur.getDate(),h,0);
+        const dayStart = mk(7), dayEnd = mk(19), eveEnd = mk(22);
+        const nextDay = new Date(cur.getTime() + 24*60*60*1000);
+        function lbl(d){ return formatBinLabel(floorToBin(d, 1)); }
+        // Night 00-07
+        areas.push([{ xAxis: lbl(mk(0)) }, { xAxis: lbl(dayStart), itemStyle: { color: 'rgba(0,0,0,0.25)' } }]);
+        // Day 07-19
+        areas.push([{ xAxis: lbl(dayStart) }, { xAxis: lbl(dayEnd), itemStyle: { color: 'rgba(147,197,253,0.14)' } }]);
+        // Evening 19-22
+        areas.push([{ xAxis: lbl(dayEnd) }, { xAxis: lbl(eveEnd), itemStyle: { color: 'rgba(100,116,139,0.12)' } }]);
+        // Night 22-24
+        areas.push([{ xAxis: lbl(eveEnd) }, { xAxis: lbl(nextDay), itemStyle: { color: 'rgba(0,0,0,0.25)' } }]);
+      }
+      return areas;
+    }
+
+    function buildPhaseGradient(labels) {
+      if (!labels.length) return 'rgba(0,0,0,0)';
+      const parseLbl = s => {
+        const [datePart, timePart] = s.split(' ');
+        const [Y,M,D] = datePart.split('-').map(n => parseInt(n,10));
+        const [h,m] = timePart.split(':').map(n => parseInt(n,10));
+        return new Date(Y, M-1, D, h, m);
+      };
+      function phaseValue(d) {
+        const t = d.getHours() + d.getMinutes() / 60;
+        if (t < 5) return 0;                 // night
+        if (t < 7) return (t - 5) / 2;       // dawn 5→7 linear
+        if (t < 19) return 1;                // day plateau
+        if (t < 22) return 1 - (t - 19) / 3; // dusk 19→22 linear
+        return 0;                             // night
+      }
+      function mix(nightRGB, dayRGB, v, a) {
+        const r = Math.round(nightRGB[0] * (1 - v) + dayRGB[0] * v);
+        const g = Math.round(nightRGB[1] * (1 - v) + dayRGB[1] * v);
+        const b = Math.round(nightRGB[2] * (1 - v) + dayRGB[2] * v);
+        return `rgba(${r},${g},${b},${a})`;
+      }
+      const night = [0,0,0];
+      const day = [147,197,253]; // light blue
+      const alpha = 0.22;
+      const stops = labels.map((lbl, i) => {
+        const d = parseLbl(lbl);
+        const v = phaseValue(d);
+        const color = mix(night, day, v, alpha);
+        return { offset: labels.length === 1 ? 1 : i / (labels.length - 1), color };
+      });
+      return new echarts.graphic.LinearGradient(0, 0, 1, 0, stops);
+    }
+
+    function renderChart() {
+      const year = parseInt($('#year').value, 10) || new Date().getFullYear();
+      const bin = parseInt($('#bin').value, 10) || 15;
+      const startInp = $('#startDT').value;
+      const endInp = $('#endDT').value;
+
+      if (!records.length) {
+        chart.clear();
+        const st = document.getElementById('status');
+        if (st) { st.textContent = 'No data loaded.'; st.classList.remove('error'); }
+        chart.setOption({ title: { text: 'No data loaded', left: 'center', textStyle: { color: '#9ca3af', fontSize: 14 } } });
+        return;
+      }
+
+      const dates = [];
+      for (const r of records) {
+        const d = toDate(r.dt, r.itime, year);
+        if (d) dates.push(d);
+      }
+      dates.sort((a,b)=>a-b);
+      const st = document.getElementById('status');
+      if (!dates.length) {
+        if (st) { st.textContent = 'Parsed records but no valid datetimes. Check date/time formats and year.'; st.classList.add('error'); }
+        chart.clear();
+        chart.setOption({ title: { text: 'No valid datetimes', left: 'center', textStyle: { color: '#9ca3af', fontSize: 14 } } });
+        return;
+      } else if (st) {
+        const first = dates[0];
+        const last = dates[dates.length-1];
+        st.textContent = `Loaded ${records.length} rows (${first.toLocaleString()} to ${last.toLocaleString()}).`;
+        st.classList.remove('error');
+      }
+      const dataStart = new Date(Math.min(...dates.map(d=>d.getTime())));
+      const dataEnd = new Date(Math.max(...dates.map(d=>d.getTime())));
+      const parsedStart = startInp ? new Date(startInp.replace('T',' ') + ':00') : new Date(dataStart.getTime() - 60*60*1000);
+      const parsedEnd = endInp ? new Date(endInp.replace('T',' ') + ':00') : new Date(dataEnd.getTime() + 60*60*1000);
+      const start = floorToBin(parsedStart, bin);
+      const end = ceilToBin(parsedEnd, bin);
+      const {labels, counts} = buildBinsInRange(start, end, bin, dates);
+
+      const maxCount = Math.max(1, ...counts);
+      const phaseGradient = buildPhaseGradient(labels);
+
+      chart.setOption({
+        backgroundColor: 'transparent',
+        title: { text: `Timeline — ${bin} min bins (${labels[0] || ''} → ${labels[labels.length-1] || ''})`, left: 10, top: 10, textStyle: { color: '#d1d5db', fontWeight: 600, fontSize: 14 } },
+        grid: { left: 50, right: 20, top: 48, bottom: 48 },
+        tooltip: {
+          trigger: 'axis', axisPointer: { type: 'shadow' },
+          backgroundColor: 'rgba(17,24,39,0.92)', borderColor: 'rgba(255,255,255,0.08)', textStyle: { color: '#e5e7eb' },
+          formatter: params => {
+            const p = params[0];
+            return `${p.axisValue}<br/>Count: <b>${p.data}</b>`;
+          }
+        },
+        xAxis: {
+          type: 'category', data: labels,
+          axisLabel: {
+            color: '#9ca3af',
+            interval: function(index, value) {
+              // show hourly labels only to avoid overlap at small bins
+              const mm = parseInt(value.slice(-2), 10);
+              return mm === 0;
+            },
+            rotate: 45,
+            hideOverlap: true
+          },
+          axisLine: { lineStyle: { color: 'rgba(255,255,255,0.10)' } },
+          splitLine: { show: false }
+        },
+        yAxis: {
+          type: 'value', minInterval: 1, max: Math.max(maxCount, 3),
+          axisLabel: { color: '#9ca3af' },
+          axisLine: { lineStyle: { color: 'rgba(255,255,255,0.10)' } },
+          splitLine: { lineStyle: { color: 'rgba(255,255,255,0.06)' } }
+        },
+        series: [{
+          type: 'bar', name: 'Events', data: counts,
+          barMaxWidth: 18,
+          itemStyle: { color: '#60a5fa' },
+          emphasis: { focus: 'series' },
+          markArea: {
+            silent: true,
+            itemStyle: { color: phaseGradient },
+            data: [ [ { xAxis: labels[0] }, { xAxis: labels[labels.length-1] } ] ]
+          }
+        }]
+      }, true);
+    }
+
+    $('#file').addEventListener('change', (e) => {
+      const f = e.target.files?.[0];
+      if (!f) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        rawText = String(reader.result || '');
+        try {
+          records = parseRecords(rawText);
+          // Autofill start/end inputs based on loaded data and current year
+          const year = parseInt($('#year').value, 10) || new Date().getFullYear();
+          const dates = [];
+          for (const r of records) {
+            const d = toDate(r.dt, r.itime, year);
+            if (d) dates.push(d);
+          }
+          if (dates.length) {
+            dates.sort((a,b)=>a-b);
+            const minD = dates[0];
+            const maxD = dates[dates.length-1];
+            const startDefault = new Date(minD.getTime() - 60*60*1000);
+            const endDefault = new Date(maxD.getTime() + 60*60*1000);
+            const startEl = document.getElementById('startDT');
+            const endEl = document.getElementById('endDT');
+            if (startEl) startEl.value = toInputValue(startDefault);
+            if (endEl) endEl.value = toInputValue(endDefault);
+            // Auto-render with new defaults
+            renderChart();
+          }
+        } catch (err) {
+          console.error(err);
+          records = [];
+          const st = document.getElementById('status');
+          if (st) { st.textContent = `Parse error: ${err?.message || err}`; st.classList.add('error'); }
+          chart.clear();
+          chart.setOption({ title: { text: 'No data loaded', left: 'center', textStyle: { color: '#9ca3af', fontSize: 14 } } });
+        }
+      };
+      reader.readAsText(f);
+    });
+
+    $('#update').addEventListener('click', renderChart);
+    $('#download').addEventListener('click', () => {
+      const url = chart.getDataURL({ pixelRatio: 2, backgroundColor: '#0b0f14' });
+      const a = document.createElement('a');
+      a.href = url; a.download = 'timeline_bins.png'; a.click();
+    });
+
+    window.addEventListener('resize', () => chart.resize());
+    // Initial empty state
+    chart.setOption({ title: { text: 'Load a file to begin', left: 'center', top: 'middle', textStyle: { color: '#9ca3af', fontSize: 14 } } });
+  </script>
+</body>
+</html>
+
+
