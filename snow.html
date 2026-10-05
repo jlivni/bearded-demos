@@ -100,28 +100,14 @@
         `);
       });
 
-      // Update Tweets with delay
-      config.tweets.forEach((tweet, i) => {
-        setTimeout(() => {
-          $("#tweets-container").append(`
-            <div class="column is-one-third">
-              <a class="twitter-timeline"
-                href="${tweet}"
-                data-tweet-limit="5"
-                data-chrome="noheader nofooter noborders transparent"
-                data-width="300"
-                data-height="300">
-                Tweets by ${tweet.split('/').pop()}
-              </a>
-            </div>
-          `);
-          // Reinitialize Twitter widgets after delay
-          if (i === config.tweets.length - 1) {
-            setTimeout(() => {
-              twttr.widgets.load();
-            }, 500);
-          }
-        }, i * 1000); // Stagger tweets every 1 second
+      // Twitter/X timeline embeds no longer work (login wall), so link out instead
+      config.tweets.forEach((tweet) => {
+        const handle = tweet.split('/').pop();
+        $("#tweets-container").append(`
+          <div class="column is-narrow">
+            <a class="button is-info is-light" href="${tweet.replace('twitter.com', 'x.com')}" target="_blank">@${handle}</a>
+          </div>
+        `);
       });
 
       // Update Remaining Webcams
@@ -134,12 +120,6 @@
           </div>
         `);
       });
-      // Initialize Twitter Widgets
-      const script = document.createElement("script");
-      script.src = "https://platform.twitter.com/widgets.js";
-      script.async = true;
-      document.body.appendChild(script);
-
       // Update Dropdown Label
       $("#current-config").text(configKey.charAt(0).toUpperCase() + configKey.slice(1));
     }
@@ -180,6 +160,7 @@
     </span>
     <div class="navbar-end">
         <div class="navbar-item">
+            <a href="photomap.html" class="button is-light mx-1">Photomap</a>
             <button id="northlake-btn" class="button is-light mx-1">Northlake</button>
             <button id="southlake-btn" class="button is-light mx-1">Southlake</button>
         </div>
