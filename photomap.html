@@ -1,152 +1,193 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Photomap</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="config.js" onerror="void 0"></script>
-  <style>
-    html, body, #map { margin: 0; padding: 0; height: 100%; }
-    #controls {
-      position: absolute; top: 10px; right: 10px; z-index: 1000;
-      background: rgba(255,255,255,.92); padding: 8px; border-radius: 4px;
-      font: 14px sans-serif; box-shadow: 0 1px 4px rgba(0,0,0,.4);
-    }
-    #controls select, #controls button { font-size: 14px; margin: 2px 0; }
-    #status { color: #666; font-size: 12px; margin-top: 4px; max-width: 180px; }
-    .photo-icon { border: 2px solid #fff; border-radius: 3px; box-shadow: 0 1px 4px rgba(0,0,0,.6);
-      background-size: cover; background-position: center; }
-    .leaflet-popup-content img { max-width: 240px; display: block; }
-    .leaflet-popup-content small { color: #666; }
-  </style>
-</head>
-<body>
-  <div id="map"></div>
-  <div id="controls">
-    <select id="provider">
-      <option value="flickr">Flickr</option>
-      <option value="commons">Wikimedia Commons</option>
-    </select>
-    <select id="sort">
-      <option value="interestingness-desc">Interesting</option>
-      <option value="date-posted-desc">Newest</option>
-    </select>
-    <div id="status"></div>
-  </div>
-<script>
-var FLICKR_KEY = window.FLICKR_KEY;
+  <head>
+    <title>Photomap</title>
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
+    <meta charset="utf-8">
+    <style>
+      html, body, #map-canvas {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+      }
+      input[type=text] {
+        margin: 10px;
+        height: 28px;
+        border: 0px;
+        font-size:1.0em;
+        padding-left: 10px;
+      }
+      select {
+        font-size:1.0em;
+        color: #444;
+        margin: 10px;
+        width: 140px;
+        height: 34px;
+        overflow: hidden;
+        border: 1px solid #ccc;
+      }
+      #copyright {
+        opacity:.8;
+        background:white;
+        padding:1px 3px 1px 3px;
+        color: #444;
+      }
+    </style>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+    <script src="config.js"></script>
+    <script>
+      // Maps key comes from config.js (gitignored)
+      document.write('<script src="https://maps.googleapis.com/maps/api/js?v=weekly&libraries=places&key=' + window.GMAPS_KEY + '"><\/script>');
+    </script>
+    <script>
 
-var map = L.map('map').setView([39.1, -120.1], 11);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 19,
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-}).addTo(map);
 
-var layer = L.layerGroup().addTo(map);
-var seq = 0;
-
-function esc(s) {
-  return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) {
-    return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c];
-  });
+function CoordMapType(tileSize) {
+  this.tileSize = tileSize;
 }
 
-function setStatus(msg) { document.getElementById('status').textContent = msg; }
+CoordMapType.prototype.getTile = function(coord, zoom, ownerDocument) {
+  var bounds = getTileBounds(coord, zoom);
+  var sw = bounds.getSouthWest();
+  var ne = bounds.getNorthEast();
+  var img = $('<div/>', {
+    id: [coord.x, coord.y, zoom].join('_')
+  }).css({width: 256, height: 256, backgroundSize: 'cover', backgroundPosition: 'center'});
 
-// Each provider resolves to [{lat, lng, thumb, title, owner, url}]
-var providers = {
-  flickr: function(bounds, sort) {
-    if (!FLICKR_KEY) return Promise.reject(new Error('no Flickr key (config.js missing)'));
-    var p = new URLSearchParams({
-      method: 'flickr.photos.search',
-      api_key: FLICKR_KEY,
-      bbox: [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()].join(','),
-      has_geo: 1,
-      per_page: 100,
-      sort: sort,
-      extras: 'geo,url_s,owner_name',
-      format: 'json',
-      nojsoncallback: 1
+  $.getJSON('https://www.flickr.com/services/rest/', {
+    method: 'flickr.photos.search',
+    api_key: window.FLICKR_KEY,
+    bbox: [sw.lng(), sw.lat(), ne.lng(), ne.lat()].join(','),
+    has_geo: 1,
+    sort: 'interestingness-desc',
+    per_page: 10,
+    extras: 'url_m',
+    format: 'json',
+    nojsoncallback: 1
+  }, function(response) {
+    var photos = ((response.photos || {}).photo || []).filter(function(p) { return p.url_m; });
+    if (!photos.length) return;
+    var imgUrl = photos[Math.floor(Math.random() * photos.length)].url_m; // random of the most interesting
+    // preload so the tile doesn't flash empty
+    $('<img/>').attr('src', imgUrl).on('load', function() {
+      img.css('backgroundImage', 'url(' + imgUrl + ')');
     });
-    return fetch('https://www.flickr.com/services/rest/?' + p).then(function(r) { return r.json(); })
-      .then(function(d) {
-        if (d.stat === 'fail') throw new Error(d.message);
-        return d.photos.photo.filter(function(x) { return x.url_s; }).map(function(x) {
-          return {
-            lat: +x.latitude, lng: +x.longitude, thumb: x.url_s, title: x.title, owner: x.ownername,
-            url: 'https://www.flickr.com/photos/' + x.owner + '/' + x.id
-          };
-        });
-      });
-  },
-
-  // Commons geosearch caps radius at 10km, so only works zoomed in
-  commons: function(bounds) {
-    var c = bounds.getCenter();
-    var radius = Math.min(10000, Math.max(10, c.distanceTo(bounds.getNorthEast())));
-    var p = new URLSearchParams({
-      action: 'query', generator: 'geosearch', ggsnamespace: 6, ggsprimary: 'all',
-      ggscoord: c.lat + '|' + c.lng, ggsradius: Math.round(radius), ggslimit: 50, // imageinfo with thumbnails is capped at 50 per request
-      prop: 'coordinates|imageinfo', colimit: 'max', iiprop: 'url', iiurlwidth: 240,
-      format: 'json', origin: '*'
-    });
-    return fetch('https://commons.wikimedia.org/w/api.php?' + p).then(function(r) { return r.json(); })
-      .then(function(d) {
-        var pages = (d.query && d.query.pages) || {};
-        return Object.keys(pages).map(function(k) { return pages[k]; })
-          .filter(function(x) { return x.coordinates && x.imageinfo; })
-          .map(function(x) {
-            return {
-              lat: x.coordinates[0].lat, lng: x.coordinates[0].lon,
-              thumb: x.imageinfo[0].thumburl, title: x.title.replace(/^File:/, ''), owner: 'Wikimedia Commons',
-              url: x.imageinfo[0].descriptionurl
-            };
-          });
-      });
-  }
+  });
+  return img[0];
 };
 
-function load() {
-  var id = ++seq;
-  var provider = document.getElementById('provider').value;
-  var sort = document.getElementById('sort').value;
-  if (provider === 'commons' && map.getZoom() < 11) {
-    layer.clearLayers();
-    setStatus('Zoom in to load Commons photos');
-    return;
+getTileBounds = function(coord, zoom) {
+  var proj = map.getProjection();
+  var tileSize = 256 / Math.pow(2, zoom);
+  var tileBounds = new google.maps.LatLngBounds(
+    proj.fromPointToLatLng(new google.maps.Point(coord.x * tileSize, (coord.y + 1) * tileSize)),
+    proj.fromPointToLatLng(new google.maps.Point((coord.x + 1) * tileSize, coord.y * tileSize))
+  );
+  return tileBounds;
+};
+
+var baseStyle = [
+  {
+    "stylers": [
+      { "color": "#1d8080" },
+      { "visibility": "off" }
+    ]
+  },{
+    "featureType": "water",
+    "stylers": [
+      { "visibility": "on" },
+      { "color": "#808080" }
+    ]
   }
-  setStatus('Loading…');
-  providers[provider](map.getBounds(), sort).then(function(photos) {
-    if (id !== seq) return; // a newer request superseded this one
-    layer.clearLayers();
-    photos.forEach(function(ph) {
-      var icon = L.divIcon({
-        className: 'photo-icon',
-        html: '', iconSize: [40, 40]
-      });
-      var m = L.marker([ph.lat, ph.lng], { icon: icon }).addTo(layer);
-      m.getElement().style.backgroundImage = 'url("' + ph.thumb + '")';
-      m.bindPopup(
-        '<a href="' + esc(ph.url) + '" target="_blank" rel="noopener"><img src="' + esc(ph.thumb) + '"></a>' +
-        '<b>' + esc(ph.title) + '</b><br><small>' + esc(ph.owner) + '</small>'
-      );
-    });
-    setStatus(photos.length + ' photos');
-  }).catch(function(e) {
-    if (id !== seq) return;
-    setStatus('Error: ' + e.message);
+]
+
+
+
+var overlayStyle = [
+  {
+    'stylers': [
+      { 'visibility': 'off' }
+    ]
+  },{
+    'featureType': 'water',
+    'elementType': 'geometry',
+    'stylers': [
+      { 'visibility': 'simplified' }
+    ]
+  },{
+    'featureType': 'road.arterial',
+    'stylers': [
+      { 'visibility': 'simplified' }
+    ]
+  },{
+    'featureType': 'road.highway',
+    'stylers': [
+      { 'visibility': 'simplified' }
+    ]
+  },{
+    "featureType": "administrative",
+    "elementType": "labels.text.stroke",
+    "stylers": [
+      { "visibility": "on" },
+      { "lightness": 44 }
+    ]
+  },{
+    "featureType": "administrative",
+    "elementType": "labels.text.fill",
+    "stylers": [
+      { "lightness": -66 },
+      { "visibility": "on" }
+    ]
+  }
+];
+
+var map, photoMap;
+
+function initialize() {
+  var mapOptions = {
+    zoom: 7,
+    center: new google.maps.LatLng(48, -122),
+    mapTypeControl: false,
+    styles: baseStyle
+  };
+  map = new google.maps.Map(document.getElementById('map-canvas'),
+      mapOptions);
+
+  photoMap = new CoordMapType(new google.maps.Size(256, 256));
+  map.overlayMapTypes.insertAt(0, photoMap);
+
+  var styledMap = new google.maps.StyledMapType(overlayStyle);
+
+  map.overlayMapTypes.insertAt(1, styledMap);
+
+  // autocomplete
+  var input = document.getElementById('searchTextField');
+  map.controls[google.maps.ControlPosition.TOP_RIGHT].push(input);
+  var autocomplete = new google.maps.places.Autocomplete(input);
+
+  autocomplete.bindTo('bounds', map);
+  google.maps.event.addListener(autocomplete, 'place_changed', function() {
+    var place = autocomplete.getPlace();
+    if (place.geometry.viewport) {
+      map.fitBounds(place.geometry.viewport);
+    } else {
+      map.setCenter(place.geometry.location);
+      map.setZoom(17);  // Why 17? Because it looks good.
+    }
   });
+
+  // copyright
+  $('#copyright').text('Photos from Flickr, copyright of their owners');
+  map.controls[google.maps.ControlPosition.BOTTOM_RIGHT].push($('#copyright')[0]);
 }
 
-var timer;
-function loadSoon() { clearTimeout(timer); timer = setTimeout(load, 400); }
+google.maps.event.addDomListener(window, 'load', initialize);
 
-map.on('moveend', loadSoon);
-document.getElementById('provider').addEventListener('change', load);
-document.getElementById('sort').addEventListener('change', load);
-load();
-</script>
-</body>
+    </script>
+  </head>
+  <body>
+    <div id="map-canvas"></div>
+    <div id="copyright"></div>
+    <input id="searchTextField" type="text" size="50">
+  </body>
 </html>
