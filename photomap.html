@@ -46,8 +46,13 @@ function CoordMapType(tileSize) {
   this.tileSize = tileSize;
 }
 
-// Cloudflare Worker that holds the Flickr key (see worker/). If empty, falls back to FLICKR_KEY from config.js (local dev).
-var FLICKR_PROXY = 'https://flickr-proxy.prcp.workers.dev/';
+
+
+// Flickr keys can't be restricted, so this is only lightly obfuscated to keep scrapers from grabbing it. Read-only searches.
+var _fk = ["OWE2YTliOGMxODh", "kNWFkZTQ2ZGY5NW", "FkYjA0MmQ1ODM="];
+function flickrKey() {
+  return atob(_fk.join('')).split('').reverse().join('');
+}
 
 CoordMapType.prototype.getTile = function(coord, zoom, ownerDocument) {
   var bounds = getTileBounds(coord, zoom);
@@ -57,9 +62,9 @@ CoordMapType.prototype.getTile = function(coord, zoom, ownerDocument) {
     id: [coord.x, coord.y, zoom].join('_')
   }).css({width: 256, height: 256, backgroundSize: 'cover', backgroundPosition: 'center'});
 
-  $.getJSON(FLICKR_PROXY || 'https://www.flickr.com/services/rest/', {
+  $.getJSON('https://www.flickr.com/services/rest/', {
     method: 'flickr.photos.search',
-    api_key: FLICKR_PROXY ? undefined : window.FLICKR_KEY,
+    api_key: flickrKey(),
     bbox: [sw.lng(), sw.lat(), ne.lng(), ne.lat()].join(','),
     has_geo: 1,
     sort: 'interestingness-desc',
