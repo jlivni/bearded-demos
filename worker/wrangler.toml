@@ -1,0 +1,3 @@
+name = "flickr-proxy"
+main = "flickr-proxy.js"
+compatibility_date = "2025-01-01"

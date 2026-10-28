@@ -36,8 +36,8 @@
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
     <script src="config.js"></script>
     <script>
-      // Maps key comes from config.js (gitignored)
-      document.write('<script src="https://maps.googleapis.com/maps/api/js?v=weekly&libraries=places&key=' + window.GMAPS_KEY + '"><\/script>');
+      // Browser Maps key is public by design; it's locked to jlivni.github.io referrers
+      document.write('<script src="https://maps.googleapis.com/maps/api/js?v=weekly&libraries=places&key=' + (window.GMAPS_KEY || 'AIzaSyAHBeP0vUzMc8WgzeOWry-vH0W9HKAa_ts') + '"><\/script>');
     </script>
     <script>
 
@@ -45,6 +45,9 @@
 function CoordMapType(tileSize) {
   this.tileSize = tileSize;
 }
+
+// Cloudflare Worker that holds the Flickr key (see worker/). If empty, falls back to FLICKR_KEY from config.js (local dev).
+var FLICKR_PROXY = 'https://flickr-proxy.prcp.workers.dev/';
 
 CoordMapType.prototype.getTile = function(coord, zoom, ownerDocument) {
   var bounds = getTileBounds(coord, zoom);
@@ -54,9 +57,9 @@ CoordMapType.prototype.getTile = function(coord, zoom, ownerDocument) {
     id: [coord.x, coord.y, zoom].join('_')
   }).css({width: 256, height: 256, backgroundSize: 'cover', backgroundPosition: 'center'});
 
-  $.getJSON('https://www.flickr.com/services/rest/', {
+  $.getJSON(FLICKR_PROXY || 'https://www.flickr.com/services/rest/', {
     method: 'flickr.photos.search',
-    api_key: window.FLICKR_KEY,
+    api_key: FLICKR_PROXY ? undefined : window.FLICKR_KEY,
     bbox: [sw.lng(), sw.lat(), ne.lng(), ne.lat()].join(','),
     has_geo: 1,
     sort: 'interestingness-desc',
